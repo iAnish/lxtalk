@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string-array name="statusArray">  
+        <item>Free to chat</item>  
+        <item>Available</item>  
+        <item>Away</item>  
+        <item>Extended away</item>  
+        <item>Don\'t disturb</item>  
+        <item>Offline</item>  
+   </string-array>
+    
+</resources>

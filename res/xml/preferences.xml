@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<PreferenceCategory
+	    android:title="Account settings">
+        <EditTextPreference
+                android:key="username"
+                android:title="Username"
+                android:summary="Your existing XMPP account name"
+                android:dialogTitle="Username" />
+        <EditTextPreference
+                android:key="password"
+                android:title="Password"
+                android:summary="Password for your XMPP account"
+                android:dialogTitle="Password" 
+                android:inputType="textPassword" />        
+    </PreferenceCategory>
+	<PreferenceCategory
+	    android:title="Other settings">
+        <CheckBoxPreference
+                android:key="archiving"
+                android:defaultValue="true"
+                android:title="Archive conversations"
+                android:summary="Log conversations into local database" />      
+    </PreferenceCategory>
+</PreferenceScreen>
