@@ -140,6 +140,8 @@ public class RosterAdapter extends BaseExpandableListAdapter{
 		
 		Group others=new Group("Others", roster.getUnfiledEntries());
 		groups.add(others);
+		
+		this.update();
 	}
 	
 	public void update(){

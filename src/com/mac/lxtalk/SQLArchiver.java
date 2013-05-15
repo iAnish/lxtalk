@@ -46,9 +46,21 @@ public class SQLArchiver {
 	public Cursor fetchConversations(String accountName, String contact){
 		SQLiteDatabase db=dbHelper.getReadableDatabase();
 		
-		String selection=ConversationEntry.COLUMN_CONTACT+" = '"+contact+"' AND "+ConversationEntry.COLUMN_ACCOUNT+" = '"+accountName+"'";
+		String selection=ConversationEntry.COLUMN_ACCOUNT+" = '"+accountName+"'";
+		
+		if(contact!=null){
+			selection+=" AND "+ConversationEntry.COLUMN_CONTACT+" = '"+contact+"'";
+		}
 		
 		return db.query(ConversationEntry.TABLE_NAME, null, selection, null, null, null, ConversationEntry.COLUMN_DATE+" DESC");
+	}
+	
+	public Cursor fetchConversation(int conversationId){
+		SQLiteDatabase db=dbHelper.getReadableDatabase();
+		
+		String selection=ConversationEntry._ID+" = "+conversationId;
+		
+		return db.query(ConversationEntry.TABLE_NAME, null, selection, null, null, null, null);
 	}
 	
 	public Cursor fetchMessages(int conversationId){
@@ -56,6 +68,6 @@ public class SQLArchiver {
 		
 		String selection=MessageEntry.COLUMN_CONVERSATION+" = "+conversationId;
 		
-		return db.query(MessageEntry.TABLE_NAME, null, selection, null, null, null, MessageEntry.COLUMN_DATE+" DESC");
+		return db.query(MessageEntry.TABLE_NAME, null, selection, null, null, null, MessageEntry.COLUMN_DATE+" ASC");
 	}
 }

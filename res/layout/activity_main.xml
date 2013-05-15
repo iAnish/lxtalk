@@ -18,25 +18,25 @@
       			android:layout_height="0dip">
      
     		    
-    		<FrameLayout android:id="@+id/contactListContainer"
-      			android:layout_width="fill_parent"
-      			android:layout_height="fill_parent">
-      			
-      			<ExpandableListView
-      			    android:id="@+id/contactList"
-      			    android:padding="4dp"
-      			    android:layout_width="fill_parent"
-      			    android:layout_height="fill_parent" />
-      			
-      			<Button
-      			    android:id="@+id/settingsButton"
-      			    android:visibility="gone"
-      			    android:layout_gravity="center"
-      			    android:layout_width="wrap_content"
-      			    android:layout_height="wrap_content"
-      			    android:text="Configure connection settings" />
-      			
-			</FrameLayout>
+	    		<FrameLayout android:id="@+id/contactListContainer"
+	      			android:layout_width="fill_parent"
+	      			android:layout_height="fill_parent">
+	      			
+	      			<ExpandableListView
+	      			    android:id="@+id/contactList"
+	      			    android:padding="4dp"
+	      			    android:layout_width="fill_parent"
+	      			    android:layout_height="fill_parent" />
+	      			
+	      			<Button
+	      			    android:id="@+id/settingsButton"
+	      			    android:visibility="gone"
+	      			    android:layout_gravity="center"
+	      			    android:layout_width="wrap_content"
+	      			    android:layout_height="wrap_content"
+	      			    android:text="Configure connection settings" />
+	      			
+				</FrameLayout>
       			
       			<ListView
       			    android:id="@+id/conversationList"
@@ -46,11 +46,27 @@
 
     		</FrameLayout>
     
-			<com.mac.lxtalk.StatusSpinner
-				android:id="@+id/status_spinner"
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:prompt="@string/choose_status" />
+		  	<LinearLayout
+		  	    android:orientation="horizontal"
+		    	android:layout_width="fill_parent"
+		    	android:layout_height="wrap_content">
+		  	    
+			  	<ImageButton
+			  		android:id="@+id/desc_button"
+			  		android:adjustViewBounds="true"
+			  		android:scaleType="centerInside"
+				    android:layout_height="fill_parent"
+				    android:layout_width="wrap_content"
+			  		android:src="@drawable/description" />
+			  	
+				<com.mac.lxtalk.StatusSpinner
+					android:id="@+id/status_spinner"
+					android:layout_weight="1"
+					android:layout_width="0dip"
+					android:layout_height="wrap_content"
+					android:prompt="@string/choose_status" />
+				
+			</LinearLayout>
 	
   </LinearLayout>
 </TabHost>

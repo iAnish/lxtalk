@@ -33,13 +33,15 @@ public class XMPPService extends Service{
 	private Presence currentPresence=new Presence(Type.unavailable);
 	private LoginData currentLoginData=null;
 	
-	private ConnectionManager mCM;
+	private ConnectionManager connectionManager;
 	private ConversationManager conversationManager;
 	
-	private IBinder mBinder=new LocalBinder();
-	private ConnectorThread mConnThread=null;
+	private Notifier notifier;
 	
-	private ConnectionListener mConnectionListener=new ConnectionListener(){
+	private IBinder binder=new LocalBinder();
+	private ConnectorThread connThread=null;
+	
+	private ConnectionListener connectionListener=new ConnectionListener(){
 		@Override
 		public void connectionClosed() {
 			Log.i(TAG, "Conn closed");
@@ -48,6 +50,8 @@ public class XMPPService extends Service{
 			sendBroadcast(i);
 			
 			currentPresence=new Presence(Type.unavailable);
+			
+			notifier.notifyServiceRunning(false);
 		}
 
 		@Override
@@ -57,8 +61,9 @@ public class XMPPService extends Service{
 			Intent i=new Intent(MSG_CONNECTION_CLOSED_ERROR);
 			sendBroadcast(i);
 			
-
 			currentPresence=new Presence(Type.unavailable);
+
+			notifier.notifyServiceRunning(false);
 		}
 
 		@Override
@@ -92,7 +97,7 @@ public class XMPPService extends Service{
 					throw new XMPPException("Incorrect login data");
 				}
 				
-				mCM.connect(loginData.getServer());
+				connectionManager.connect(loginData.getServer());
 					
 			}catch(XMPPException e){
 				Log.w(TAG, e);
@@ -104,16 +109,15 @@ public class XMPPService extends Service{
 				return;
 			}
 			
-			mCM.addConnectionListener(mConnectionListener);
+			connectionManager.addConnectionListener(connectionListener);
 			
-			mCM.addPacketListener(new PresenceListener(), new PacketTypeFilter(Presence.class));
+			connectionManager.addPacketListener(new PresenceListener(), new PacketTypeFilter(Presence.class));
 			
-			mCM.addPacketListener(conversationManager.getIncomingListener(), new PacketTypeFilter(Message.class));
-			mCM.addPacketSendingListener(conversationManager.getOutcomingListener(), new PacketTypeFilter(Message.class));
-			
+			connectionManager.addPacketListener(conversationManager.getIncomingListener(), new PacketTypeFilter(Message.class));
+			connectionManager.addPacketSendingListener(conversationManager.getOutcomingListener(), new PacketTypeFilter(Message.class));
 			
 			try{
-				mCM.login(loginData.getUsername(), loginData.getPassword());
+				connectionManager.login(loginData.getUsername(), loginData.getPassword());
 					
 			}catch(Exception e){
 				Log.w(TAG, e);
@@ -132,6 +136,8 @@ public class XMPPService extends Service{
 			Intent i=new Intent(MSG_LOGIN_SUCCEEDED);
 			i.putExtra("account", loginData.getAccountName());
 			sendBroadcast(i);
+			
+			notifier.notifyServiceRunning(true);
 		}
 		
 	}
@@ -158,7 +164,7 @@ public class XMPPService extends Service{
 	}
 	
 	public Roster getRoster(){
-		return mCM.getRoster();
+		return connectionManager.getRoster();
 	}
 	
 	public class LocalBinder extends Binder{
@@ -168,7 +174,7 @@ public class XMPPService extends Service{
 	}
 	
 	public void setPresence(final Presence presence){
-		if(!mCM.isAuthenticated()){
+		if(!connectionManager.isAuthenticated()){
 			Log.e(TAG, "setPresence called when not authenticated");
 			return;
 		}
@@ -176,7 +182,7 @@ public class XMPPService extends Service{
 		new Thread(){
 			@Override
 			public void run(){
-				mCM.setPresence(presence);			
+				connectionManager.setPresence(presence);			
 			}
 		}.start();
 		
@@ -185,7 +191,7 @@ public class XMPPService extends Service{
 	
 	public void sendMessage(String to, String body) throws Exception{
 
-		if(!mCM.isAuthenticated()){
+		if(!connectionManager.isAuthenticated()){
 			throw new Exception("Not connected");
 		}
 		
@@ -193,19 +199,19 @@ public class XMPPService extends Service{
 		msg.setTo(to);
 		msg.setBody(body);
 		
-		mCM.sendMessage(msg);
+		connectionManager.sendMessage(msg);
 	}
 	
 	public void connectToServer(final LoginData loginData){
 		
-		if(mConnThread!=null && mConnThread.isAlive()){
+		if(connThread!=null && connThread.isAlive()){
 			
 			//if connecting in progress, wait and set presence when connected
 			new Thread(){
 				@Override
 				public void run(){
 					try{
-						mConnThread.join();
+						connThread.join();
 					}catch(InterruptedException e){
 						Log.e(TAG, "exception", e);
 					}
@@ -224,12 +230,12 @@ public class XMPPService extends Service{
 		currentLoginData=loginData;
 		
 		
-		mConnThread=new ConnectorThread(loginData);
-		mConnThread.start();
+		connThread=new ConnectorThread(loginData);
+		connThread.start();
 	}
 	
 	public boolean isOnline(){		
-		return mCM.isAuthenticated();
+		return connectionManager.isAuthenticated();
 	}
 	
 	@Override
@@ -238,15 +244,20 @@ public class XMPPService extends Service{
 
 		conversationManager=new ConversationManager(XMPPService.this);
 		
-		ConnectionManager.init(this);
-		mCM=new ConnectionManager();
+		ConnectionManager.init(this.getApplicationContext());
+		connectionManager=new ConnectionManager();
+		
+		notifier=(Notifier)((MyApplication)this.getApplicationContext()).getNotifier();
+		notifier.notifyServiceRunning(false);
 	}
 
 	@Override
-	public void onDestroy() {
-		super.onDestroy();
+	public void onDestroy() {	
+		connectionManager.disconnect();
 		
-		mCM.disconnect();
+		notifier.cancelAll();
+
+		super.onDestroy();
 	}
 
 	@Override
@@ -256,29 +267,29 @@ public class XMPPService extends Service{
 
 	@Override
 	public IBinder onBind(Intent intent) {
-		return mBinder;
+		return binder;
 	}
 	
 	public void disconnectFromServer(){
 		
-		if(mConnThread!=null && mConnThread.isAlive()){
+		if(connThread!=null && connThread.isAlive()){
 			
 			//if connecting is in progress, wait and close connection
 			new Thread(){
 				@Override
 				public void run(){
 					try{
-						mConnThread.join();
+						connThread.join();
 					}catch(InterruptedException e){
 						Log.e(TAG, e.getMessage());
 					}
 
-					mCM.disconnect();
+					connectionManager.disconnect();
 				}
 			}.start();
 		}
 		else{
-			mCM.disconnect();	
+			connectionManager.disconnect();	
 		}
 		
 	}

@@ -6,9 +6,11 @@ import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.util.StringUtils;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
@@ -19,6 +21,7 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -26,6 +29,7 @@ import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ExpandableListView;
 import android.widget.ExpandableListView.ExpandableListContextMenuInfo;
 import android.widget.ExpandableListView.OnChildClickListener;
@@ -36,83 +40,94 @@ import android.widget.Toast;
 public class MainActivity extends Activity  {
 	private static final String TAG="MainActivity";
 	
-	private StatusSpinner mStatusSpinner;
-	private ExpandableListView mContactsView;
-	private ListView mConversationsView;
-	private Button mSettingsButton;
-	
+	private StatusSpinner statusSpinner;
+	private ExpandableListView contactsView;
+	private ListView conversationsView;
+	private Button settingsButton;
 	
 	private SharedPreferences sharedPrefs;
 	
-	private XMPPService mService=null;
+	private XMPPService xmppService=null;
 	
-	private ServiceConnection mServiceConnection;
+	private ServiceConnection serviceConnection;
 	
-	private static final IntentFilter mConnectionEventFilter=new IntentFilter();
-	private static final IntentFilter mPresenceFilter=new IntentFilter();
-	private static final IntentFilter mNewMessageFilter=new IntentFilter();
+	private String description="";
 	
-	private final BroadcastReceiver mConnectionEventReceiver=new BroadcastReceiver(){
+	private static final IntentFilter connectionEventFilter=new IntentFilter();
+	private static final IntentFilter presenceFilter=new IntentFilter();
+	private static final IntentFilter newMessageFilter=new IntentFilter();
+	
+	private final BroadcastReceiver connectionEventReceiver=new BroadcastReceiver(){
 		
 		public void onReceive(Context ctx, Intent intent){
 			
 			if(intent.getAction().equals(XMPPService.MSG_CONNECTION_FAILED)){
-				mStatusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
+				statusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
 				Toast.makeText(MainActivity.this, "Connection failed: "+intent.getStringExtra("exception_msg"), Toast.LENGTH_SHORT).show();
+
+				MainActivity.this.setProgressBarIndeterminateVisibility(false);
 			}
 			
 			else if(intent.getAction().equals(XMPPService.MSG_LOGIN_FAILED)){
-				mStatusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
+				statusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
 				Toast.makeText(MainActivity.this, "Authentication failed: "+intent.getStringExtra("exception_msg"), Toast.LENGTH_SHORT).show();
+
+				MainActivity.this.setProgressBarIndeterminateVisibility(false);
 			}
 			
 			else if(intent.getAction().equals(XMPPService.MSG_LOGIN_SUCCEEDED)){
 				Toast.makeText(MainActivity.this, "Login OK!", Toast.LENGTH_SHORT).show();
 				
-				
-				int spinnerPos=Utils.presenceToPosition(mService.getPresence());
-				mStatusSpinner.setSelectionFixed(spinnerPos);
+				int spinnerPos=Utils.presenceToPosition(xmppService.getPresence());
+				statusSpinner.setSelectionFixed(spinnerPos);
 				
 				String loggedAs=intent.getStringExtra("account");
 				sharedPrefs.edit().putString("loggedAs", loggedAs).commit();
-
+				
 		        populateRoster();
+				MainActivity.this.setProgressBarIndeterminateVisibility(false);
 			}
 			else if(intent.getAction().equals(XMPPService.MSG_CONNECTION_CLOSED) || intent.getAction().equals(XMPPService.MSG_CONNECTION_CLOSED_ERROR)){
-				Toast.makeText(MainActivity.this, "Connection closed!", Toast.LENGTH_SHORT).show();
-				mStatusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
+				Log.i(TAG, "Connection closed");
+				statusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
 
-				((RosterAdapter)mContactsView.getExpandableListAdapter()).update();
-				
 			}
 			
-			MainActivity.this.setProgressBarIndeterminateVisibility(false);
+			updateRoster();
+			updateConversations();
 		}
 	};
 	
-	private final BroadcastReceiver mPresenceUpdateReceiver=new BroadcastReceiver(){
+	private final BroadcastReceiver presenceUpdateReceiver=new BroadcastReceiver(){
 		public void onReceive(Context ctx, Intent intent){
-			((RosterAdapter)mContactsView.getExpandableListAdapter()).update();
+			updateRoster();
 		}
 	};
 	
-	private final BroadcastReceiver mNewMessageReceiver=new BroadcastReceiver(){
+	private final BroadcastReceiver newMessageReceiver=new BroadcastReceiver(){
 		public void onReceive(Context ctx, Intent intent){
-
-			((ConversationListAdapter)mConversationsView.getAdapter()).notifyDataSetChanged();
+			updateConversations();
 		}
 	};
 	
 	private void populateRoster(){
 		
-		Roster roster=mService.getRoster();
+		Roster roster=xmppService.getRoster();
 		RosterAdapter rosterAdapter=new RosterAdapter(this, roster);
 
-		mContactsView.setAdapter(rosterAdapter);
+		contactsView.setAdapter(rosterAdapter);
 		
 		expandGroups();
 	}
 
+	private void updateRoster(){
+		if(contactsView.getExpandableListAdapter()!=null)
+			((RosterAdapter)contactsView.getExpandableListAdapter()).update();
+	}
+	
+	private void updateConversations(){
+		((ConversationListAdapter)conversationsView.getAdapter()).notifyDataSetChanged();
+	}
 	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -126,8 +141,8 @@ public class MainActivity extends Activity  {
         
         setupStatusSpinner();
         
-        mSettingsButton=(Button)this.findViewById(R.id.settingsButton);
-        mSettingsButton.setOnClickListener(new View.OnClickListener() {
+        settingsButton=(Button)this.findViewById(R.id.settingsButton);
+        settingsButton.setOnClickListener(new View.OnClickListener() {
 			
 			@Override
 			public void onClick(View v) {
@@ -135,14 +150,14 @@ public class MainActivity extends Activity  {
 			}
 		});
         
-        mContactsView=(ExpandableListView)findViewById(R.id.contactList);
-        this.registerForContextMenu(mContactsView);
-        mContactsView.setOnChildClickListener(new OnChildClickListener(){
+        contactsView=(ExpandableListView)findViewById(R.id.contactList);
+        this.registerForContextMenu(contactsView);
+        contactsView.setOnChildClickListener(new OnChildClickListener(){
 
 			@Override
 			public boolean onChildClick(ExpandableListView parent, View v, int groupPosition, int childPosition, long id) {
 				
-				RosterEntry entry=(RosterEntry)mContactsView.getExpandableListAdapter().getChild(groupPosition, childPosition);
+				RosterEntry entry=(RosterEntry)contactsView.getExpandableListAdapter().getChild(groupPosition, childPosition);
 
 				Intent intent=new Intent(MainActivity.this, ChatActivity.class);
 				intent.putExtra("contact", entry.getUser());
@@ -154,15 +169,15 @@ public class MainActivity extends Activity  {
         	
         });
         
-        mConversationsView=(ListView)findViewById(R.id.conversationList);
+        conversationsView=(ListView)findViewById(R.id.conversationList);
         
-        mConversationsView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        conversationsView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
 			@Override
 			public void onItemClick(AdapterView<?> v, View view, int position,
 					long id) {
 				
-				Conversation conversation=(Conversation)mConversationsView.getItemAtPosition(position);
+				Conversation conversation=(Conversation)conversationsView.getItemAtPosition(position);
 				String user=conversation.getContact();
 				
 				Intent intent=new Intent(MainActivity.this, ChatActivity.class);
@@ -174,40 +189,77 @@ public class MainActivity extends Activity  {
 		});
          
         
-        mServiceConnection=new ServiceConnection(){
+        serviceConnection=new ServiceConnection(){
         	public void onServiceConnected(ComponentName name, IBinder service){
-        		mService=((XMPPService.LocalBinder)service).getService();
+        		xmppService=((XMPPService.LocalBinder)service).getService();
         		Log.i(TAG, "XMPP service connected");
         		
 
-        		ConversationListAdapter conversationAdapter=new ConversationListAdapter(MainActivity.this, mService.getConversationManager().getConversations());
-        		mConversationsView.setAdapter(conversationAdapter);
+        		ConversationListAdapter conversationAdapter=new ConversationListAdapter(MainActivity.this, xmppService.getConversationManager().getConversations());
+        		conversationsView.setAdapter(conversationAdapter);
         		
-        		if(mService.isOnline()){
+        		if(xmppService.isOnline()){
     		        populateRoster();
         		}
         		
-        		int spinnerPosition=Utils.presenceToPosition(mService.getPresence());
-        		mStatusSpinner.setSelectionFixed(spinnerPosition);
+        		int spinnerPosition=Utils.presenceToPosition(xmppService.getPresence());
+        		statusSpinner.setSelectionFixed(spinnerPosition);
         	}
         	
         	public void onServiceDisconnected(ComponentName name){
-        		mService=null;
+        		xmppService=null;
         		Log.w(TAG, "XMPP service disconnected");
         	}
         };
         
         
+        this.findViewById(R.id.desc_button).setOnClickListener(new View.OnClickListener() {	
+			@Override
+			public void onClick(View v) {
+				AlertDialog.Builder builder=new AlertDialog.Builder(MainActivity.this);
+				builder.setTitle("Insert status description");
+				builder.setIcon(R.drawable.description);
+				
+				LayoutInflater inflater=(LayoutInflater)MainActivity.this.getSystemService(LAYOUT_INFLATER_SERVICE);
+				View layout=(View)inflater.inflate(R.layout.desc_dialog, null, false);
+				final EditText text=(EditText)layout.findViewById(R.id.description);
+				builder.setView(layout);
+				builder.setPositiveButton("OK", new DialogInterface.OnClickListener(){
 
-		mConnectionEventFilter.addAction(XMPPService.MSG_CONNECTION_FAILED);
-		mConnectionEventFilter.addAction(XMPPService.MSG_LOGIN_FAILED);
-		mConnectionEventFilter.addAction(XMPPService.MSG_LOGIN_SUCCEEDED);
-		mConnectionEventFilter.addAction(XMPPService.MSG_CONNECTION_CLOSED);
-		mConnectionEventFilter.addAction(XMPPService.MSG_CONNECTION_CLOSED_ERROR);
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						MainActivity.this.description=text.getText().toString();
+						
+						if(xmppService==null || xmppService.isOnline()==false){
+							return;
+						}
+						
+						Presence presence=Utils.positionToPresence(statusSpinner.getSelectedItemPosition());
+						if(description.length()!=0)
+							presence.setStatus(description);
+						
+						xmppService.setPresence(presence);
+					}
+					
+				});
+				
+				builder.setNegativeButton("Cancel", null);
+				
+				builder.show();
+			}
+		});
+        
+        
+
+		connectionEventFilter.addAction(XMPPService.MSG_CONNECTION_FAILED);
+		connectionEventFilter.addAction(XMPPService.MSG_LOGIN_FAILED);
+		connectionEventFilter.addAction(XMPPService.MSG_LOGIN_SUCCEEDED);
+		connectionEventFilter.addAction(XMPPService.MSG_CONNECTION_CLOSED);
+		connectionEventFilter.addAction(XMPPService.MSG_CONNECTION_CLOSED_ERROR);
 		
-		mPresenceFilter.addAction(XMPPService.MSG_PRESENCE_UPDATE);
+		presenceFilter.addAction(XMPPService.MSG_PRESENCE_UPDATE);
 		
-		mNewMessageFilter.addAction(XMPPService.MSG_NEW_MESSAGE);
+		newMessageFilter.addAction(XMPPService.MSG_NEW_MESSAGE);
 		
         this.startService(new Intent(this.getApplicationContext(), XMPPService.class));
         
@@ -219,12 +271,12 @@ public class MainActivity extends Activity  {
         TabHost.TabSpec spec=tabs.newTabSpec("contactList");
         
         spec.setContent(R.id.contactListContainer);
-        spec.setIndicator("Contact list");
+        spec.setIndicator("Contact list", this.getResources().getDrawable(R.drawable.contacts));
         tabs.addTab(spec);
         
         spec=tabs.newTabSpec("conversations");
         spec.setContent(R.id.conversationList);
-        spec.setIndicator("Conversations");
+        spec.setIndicator("Conversations", this.getResources().getDrawable(R.drawable.conversations));
         tabs.addTab(spec);
     }
 
@@ -233,76 +285,78 @@ public class MainActivity extends Activity  {
 	protected void onStart() {
 		super.onStart();
 		
-		this.bindService(new Intent(this,  XMPPService.class), mServiceConnection, BIND_AUTO_CREATE);
+		this.bindService(new Intent(this,  XMPPService.class), serviceConnection, BIND_AUTO_CREATE);
 		
-		this.registerReceiver(mConnectionEventReceiver, mConnectionEventFilter);
-		this.registerReceiver(mPresenceUpdateReceiver, mPresenceFilter);
-		this.registerReceiver(mNewMessageReceiver, mNewMessageFilter);
+		this.registerReceiver(connectionEventReceiver, connectionEventFilter);
+		this.registerReceiver(presenceUpdateReceiver, presenceFilter);
+		this.registerReceiver(newMessageReceiver, newMessageFilter);
 		
 		if(sharedPrefs.getString("username", "").equals("") || 
 				sharedPrefs.getString("password", "").equals("")){
 			
-			mContactsView.setVisibility(View.GONE);
-			mSettingsButton.setVisibility(View.VISIBLE);
-			mStatusSpinner.setVisibility(View.INVISIBLE);
+			contactsView.setVisibility(View.GONE);
+			settingsButton.setVisibility(View.VISIBLE);
+			statusSpinner.setEnabled(false);
 		}
 		else{
-			mContactsView.setVisibility(View.VISIBLE);
-			mSettingsButton.setVisibility(View.GONE);
-			mStatusSpinner.setVisibility(View.VISIBLE);
+			contactsView.setVisibility(View.VISIBLE);
+			settingsButton.setVisibility(View.GONE);
+			statusSpinner.setEnabled(true);
 		}
 	}
 
 	@Override
 	protected void onStop() {
-		super.onStop();
 
-		if(mService!=null){
-			this.unbindService(mServiceConnection);
+		this.unregisterReceiver(newMessageReceiver);
+		this.unregisterReceiver(presenceUpdateReceiver);
+		this.unregisterReceiver(connectionEventReceiver);
+
+		if(xmppService!=null){
+			this.unbindService(serviceConnection);
 		}
 		
-		this.unregisterReceiver(mConnectionEventReceiver);
-		this.unregisterReceiver(mPresenceUpdateReceiver);
-		this.unregisterReceiver(mNewMessageReceiver);
+		super.onStop();
 	}
 
 	
 	private void setupStatusSpinner(){		
-        mStatusSpinner=(StatusSpinner)this.findViewById(R.id.status_spinner);
-        mStatusSpinner.setOnItemSelectedListener(new OnItemSelectedListener(){
+        statusSpinner=(StatusSpinner)this.findViewById(R.id.status_spinner);
+        statusSpinner.setOnItemSelectedListener(new OnItemSelectedListener(){
 
 			@Override
 			public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 				
-				if(mService==null){
-					//TODO
+				if(xmppService==null){
+					statusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
 					return;
 				}
 				
 				if(position==StatusSpinner.STATUS_POS_OFFLINE){
-					mService.disconnectFromServer();
+					xmppService.disconnectFromServer();
 					return;
 				}
 				
 				Presence presence=Utils.positionToPresence(position);
+				if(description.length()!=0){
+					presence.setStatus(description);
+				}
 				
-				if(position!=StatusSpinner.STATUS_POS_OFFLINE && !mService.isOnline()){
-					mStatusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
+				if(position!=StatusSpinner.STATUS_POS_OFFLINE && !xmppService.isOnline()){
+					statusSpinner.setSelectionFixed(StatusSpinner.STATUS_POS_OFFLINE);
 			        setProgressBarIndeterminateVisibility(true);
-			        
-			        
 
 					String accountName=sharedPrefs.getString("username", "");
 					String password=sharedPrefs.getString("password", "");
 
 					LoginData loginData=new LoginData(accountName, password, presence);
 					
-					mService.connectToServer(loginData);
+					xmppService.connectToServer(loginData);
 					
 					return;
 				}
 				
-				mService.setPresence(presence);
+				xmppService.setPresence(presence);
 			}
 
 			@Override
@@ -322,7 +376,7 @@ public class MainActivity extends Activity  {
 			
 			int group=ExpandableListView.getPackedPositionGroup(info.packedPosition);
 			int child=ExpandableListView.getPackedPositionChild(info.packedPosition);
-			RosterEntry entry=(RosterEntry)mContactsView.getExpandableListAdapter().getChild(group, child);
+			RosterEntry entry=(RosterEntry)contactsView.getExpandableListAdapter().getChild(group, child);
 			
 			Intent i=new Intent(this, ArchiveActivity.class);
 			i.putExtra("contact", StringUtils.parseBareAddress(entry.getUser()));
@@ -345,7 +399,7 @@ public class MainActivity extends Activity  {
 			this.getMenuInflater().inflate(R.menu.contact_context_menu, menu);
 			int group=ExpandableListView.getPackedPositionGroup(info.packedPosition);
 			int child=ExpandableListView.getPackedPositionChild(info.packedPosition);
-			RosterEntry entry=(RosterEntry)mContactsView.getExpandableListAdapter().getChild(group, child);
+			RosterEntry entry=(RosterEntry)contactsView.getExpandableListAdapter().getChild(group, child);
 			
 			menu.setHeaderTitle( entry.getName()==null ? StringUtils.parseBareAddress(entry.getUser()) : entry.getName() );
 		}
@@ -366,6 +420,9 @@ public class MainActivity extends Activity  {
 		case R.id.action_settings:
 			this.startActivity(new Intent(this, SettingsActivity.class));
 			return true;
+		case R.id.action_archive:
+			this.startActivity(new Intent(this, ArchiveActivity.class));
+			return true;
 		case R.id.action_exit:
 			exit();
 			return true;
@@ -376,7 +433,7 @@ public class MainActivity extends Activity  {
 	}
 	
 	private void exit(){
-		mStatusSpinner.setSelection(StatusSpinner.STATUS_POS_OFFLINE);
+		statusSpinner.setSelection(StatusSpinner.STATUS_POS_OFFLINE);
 
 		this.stopService(new Intent(this, XMPPService.class));
 		
@@ -384,8 +441,8 @@ public class MainActivity extends Activity  {
 	}
 	
 	private void expandGroups(){
-		int c=mContactsView.getExpandableListAdapter().getGroupCount();
+		int c=contactsView.getExpandableListAdapter().getGroupCount();
 		for(int i=0;i<c;i++)
-			mContactsView.expandGroup(i);
+			contactsView.expandGroup(i);
 	}
 }

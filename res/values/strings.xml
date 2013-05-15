@@ -4,8 +4,7 @@
     <string name="app_name">LXTalk</string>
     <string name="action_settings">Settings</string>
     <string name="action_exit">Exit</string>
-    <string name="action_archive">Show archive</string>
-    <string name="hello_world">Hello world!</string>
+    <string name="action_archive">Archive</string>
     <string name="choose_status">Choose your status</string>
     <string name="title_activity_chat">ChatActivity</string>
     <string name="title_activity_settings">SettingsActivity</string>

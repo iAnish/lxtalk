@@ -47,7 +47,7 @@ public class MessageAdapter extends ArrayAdapter<MessageExtended> {
 			layoutView.setBackgroundColor(0xffeeeeff);
 		}
 		else{
-			layoutView.setBackgroundColor(0xfffcfcfc);
+			layoutView.setBackgroundColor(0xffefeff);
 		}
 		
 		return layoutView;

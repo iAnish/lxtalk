@@ -171,7 +171,7 @@ public class ChatActivity extends ListActivity {
 	@Override
 	protected void onStop() {
 		notifier.setActiveChat(null);
-		
+
 		this.unregisterReceiver(msgReceiver);
 		this.unregisterReceiver(presenceReceiver);
 		

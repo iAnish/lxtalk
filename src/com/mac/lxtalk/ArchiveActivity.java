@@ -13,7 +13,6 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.widget.SimpleCursorAdapter;
 import android.support.v4.widget.SimpleCursorAdapter.ViewBinder;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -26,7 +25,7 @@ import com.mac.lxtalk.SQLEntries.ConversationEntry;
 
 public class ArchiveActivity extends ListActivity {
 
-	private static final String TAG="ArchiveActivity";
+	//private static final String TAG="ArchiveActivity";
 	
 	private ListView listView;
 	
@@ -37,14 +36,18 @@ public class ArchiveActivity extends ListActivity {
 		
 		listView=this.getListView();
 		
-		Bundle extras=this.getIntent().getExtras();
-		String contact=extras.getString("contact");
-		if(contact==null){
-			Log.e(TAG, "No extras given");
-			this.finish();
+		String contact=null;
+		if(this.getIntent().hasExtra("contact")){
+			Bundle extras=this.getIntent().getExtras();
+
+			contact=extras.getString("contact");
 		}
 		
-		this.setTitle("Conversations with "+contact);
+		if(contact==null){
+			this.setTitle("Conversations archive");
+		}else{
+			this.setTitle("Conversations with "+contact);
+		}
 		
 		TextView textEmpty=(TextView)this.findViewById(android.R.id.empty);
 		textEmpty.setText("No entries for "+contact);	
@@ -57,18 +60,9 @@ public class ArchiveActivity extends ListActivity {
 		
 		listView.setOnItemClickListener((new OnItemClickListener() {
 			@Override
-			public void onItemClick(AdapterView<?> parent, View view, int position, long id){
-				
-				Cursor c=(Cursor)listView.getItemAtPosition(position);
-				
-				int conversationId=c.getInt(c.getColumnIndex(ConversationEntry._ID));
-				int date=c.getInt(c.getColumnIndex(ConversationEntry.COLUMN_DATE));
-				String contact=c.getString(c.getColumnIndex(ConversationEntry.COLUMN_CONTACT));
-				
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id){	
 				Intent i=new Intent(ArchiveActivity.this, ArchiveEntryActivity.class);
-				i.putExtra("conversationId", conversationId);
-				i.putExtra("contact", contact);
-				i.putExtra("date", date);
+				i.putExtra("conversationId", (int)id);
 				ArchiveActivity.this.startActivity(i);
 			}
 		}));

@@ -16,6 +16,7 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.mac.lxtalk.SQLEntries.ConversationEntry;
 import com.mac.lxtalk.SQLEntries.MessageEntry;
 
 public class ArchiveEntryActivity extends ListActivity {
@@ -26,11 +27,8 @@ public class ArchiveEntryActivity extends ListActivity {
 		setContentView(R.layout.activity_archive_entry);
 		
 		int conversationId=this.getIntent().getIntExtra("conversationId", 0);
-		String contact=this.getIntent().getStringExtra("contact");
-		Date date=new Date(this.getIntent().getIntExtra("date", 0));
 		
-		DateFormat format=DateFormat.getDateInstance();
-		this.setTitle("Conversation with "+contact+", "+format.format(date));
+		this.setTitle("Archive");
 		
 		ConversationLoader loader=new ConversationLoader();
 		loader.execute(conversationId);
@@ -56,35 +54,52 @@ public class ArchiveEntryActivity extends ListActivity {
 	private class ConversationLoader extends AsyncTask<Integer, Void, List<MessageExtended>>{
 
 		private ProgressDialog dialog;
+		private Date date;
+		private String contact;
 		
 		@Override
 		protected List<MessageExtended> doInBackground(Integer... arg) {
+			int conversationId=arg[0];
+			
 			SQLArchiver archiver=(SQLArchiver)((MyApplication)ArchiveEntryActivity.this.getApplicationContext()).getArchiver();
-			Cursor c=archiver.fetchMessages(arg[0]);
+			Cursor cursor=archiver.fetchConversation(conversationId);
+			if(!cursor.moveToFirst()){
+				//TODO
+			}
+			contact=cursor.getString(cursor.getColumnIndex(ConversationEntry.COLUMN_CONTACT));
+			date=new Date(cursor.getLong(cursor.getColumnIndex(ConversationEntry.COLUMN_DATE)));
+			
+			cursor.close();
+			
+			
+			cursor=archiver.fetchMessages(conversationId);
 			
 			List<MessageExtended> list=new ArrayList<MessageExtended>();
 			
-			while(c.moveToNext()){
+			while(cursor.moveToNext()){
 				Message msg=new Message();
-				msg.setBody(c.getString(c.getColumnIndex(MessageEntry.COLUMN_BODY)));
-				msg.setFrom(c.getString(c.getColumnIndex(MessageEntry.COLUMN_FROM)));
-				msg.setTo(c.getString(c.getColumnIndex(MessageEntry.COLUMN_TO)));
+				msg.setBody(cursor.getString(cursor.getColumnIndex(MessageEntry.COLUMN_BODY)));
+				msg.setFrom(cursor.getString(cursor.getColumnIndex(MessageEntry.COLUMN_FROM)));
+				msg.setTo(cursor.getString(cursor.getColumnIndex(MessageEntry.COLUMN_TO)));
 				
-				MessageExtended.Direction direction=MessageExtended.Direction.values()[c.getInt(c.getColumnIndex(MessageEntry.COLUMN_DIRECTION))];
-				Date date=new Date(c.getInt(c.getColumnIndex(MessageEntry.COLUMN_DATE)));
+				MessageExtended.Direction direction=MessageExtended.Direction.values()[cursor.getInt(cursor.getColumnIndex(MessageEntry.COLUMN_DIRECTION))];
+				Date msgDate=new Date(cursor.getLong(cursor.getColumnIndex(MessageEntry.COLUMN_DATE)));
 				
-				MessageExtended msgExtended=new MessageExtended(msg, direction, date);
+				MessageExtended msgExtended=new MessageExtended(msg, direction, msgDate);
 				
 				list.add(msgExtended);
 			}
 			
-			c.close();
+			cursor.close();
 			
 			return list;
 		}
 
 		@Override
 		protected void onPostExecute(List<MessageExtended> result) {
+			DateFormat format=DateFormat.getDateInstance();
+			setTitle("Conversation with "+contact+", "+format.format(date));
+			
 			MessageAdapter adapter=new MessageAdapter(ArchiveEntryActivity.this, result);
 			ArchiveEntryActivity.this.setListAdapter(adapter);
 			dialog.dismiss();

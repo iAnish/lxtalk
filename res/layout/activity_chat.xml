@@ -30,6 +30,8 @@
     
     <ListView
         android:id="@android:id/list"
+        android:clickable="false"
+        android:focusable="false"
         android:layout_width="match_parent"
         android:layout_height="0dip"
         android:ems="5"

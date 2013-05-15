@@ -21,5 +21,10 @@
                 android:defaultValue="true"
                 android:title="Archive conversations"
                 android:summary="Log conversations into local database" />      
+        <CheckBoxPreference
+                android:key="vibrate"
+                android:defaultValue="true"
+                android:title="Vibrations"
+                android:summary="Vibrate when new message arrives" />    
     </PreferenceCategory>
 </PreferenceScreen>

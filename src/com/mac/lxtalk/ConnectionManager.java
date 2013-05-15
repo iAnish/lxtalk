@@ -22,7 +22,7 @@ import android.util.Log;
 public class ConnectionManager {
 	private static final String TAG="ConnectionManager";
 	
-	private XMPPConnection mConnection=null;
+	private XMPPConnection connection=null;
 	
 	
 	public ConnectionManager() {
@@ -30,15 +30,15 @@ public class ConnectionManager {
 	
 	public static void init(Context ctx){
 		SmackAndroid.init(ctx);
-		
+
 		System.setProperty("smack.debugEnabled", "true");
 		XMPPConnection.DEBUG_ENABLED = true;
 	}
 	
 	
 	public void connect(String server) throws XMPPException{
-		if(mConnection!=null)
-			mConnection.disconnect();
+		if(connection!=null)
+			connection.disconnect();
 		
 		
 		AndroidConnectionConfiguration config=new AndroidConnectionConfiguration(server, 5222);
@@ -48,75 +48,75 @@ public class ConnectionManager {
 		config.setRosterLoadedAtLogin(true);
 		config.setReconnectionAllowed(false);
 		
-		mConnection=new XMPPConnection(config);
-		mConnection.connect();
+		connection=new XMPPConnection(config);
+		connection.connect();
 		
-		if(!mConnection.isConnected())
+		if(!connection.isConnected())
 			throw new XMPPException("Unknown connection error");
 	}
 	
 	
 	public void login(String username, String password) throws Exception{
-		if(mConnection==null || !mConnection.isConnected()){
+		if(connection==null || !connection.isConnected()){
 			Log.e(TAG, "login called when not connected");
 			return;
 		}
 		
-		mConnection.login(username, password);
+		connection.login(username, password);
 		
-		if(!mConnection.isAuthenticated())
+		if(!connection.isAuthenticated())
 			throw new IllegalStateException("Unknown login error");
 	}
 	
 	
 	public void setPresence(Presence presence){
-		if(mConnection==null || !mConnection.isAuthenticated()){
+		if(connection==null || !connection.isAuthenticated()){
 			Log.e(TAG, "setPresence called when not authenticated");
 			return;
 		}
 
-		mConnection.sendPacket(presence);
+		connection.sendPacket(presence);
 	}
 	
 	public void sendMessage(Message msg) throws XMPPException{
-		Chat chat=mConnection.getChatManager().createChat(msg.getTo(), null);
+		Chat chat=connection.getChatManager().createChat(msg.getTo(), null);
 		chat.sendMessage(msg);
 	}
 	
 	public void disconnect(){
-		if(mConnection==null)
+		if(connection==null)
 			return;
 		
-		mConnection.disconnect();
+		connection.disconnect();
 	}
 	
 	public Roster getRoster(){
-		if(mConnection==null)
+		if(connection==null)
 			return null;
 		
-		return mConnection.getRoster();
+		return connection.getRoster();
 	}
 	
 	public void addConnectionListener(ConnectionListener listener){
-		if(mConnection!=null)
-			mConnection.addConnectionListener(listener);
+		if(connection!=null)
+			connection.addConnectionListener(listener);
 		
 	}
 	
 	public void addPacketListener(PacketListener listener, PacketFilter filter){
-		if(mConnection!=null)
-			mConnection.addPacketListener(listener, filter);
+		if(connection!=null)
+			connection.addPacketListener(listener, filter);
 		
 	}
 	
 	public void addPacketSendingListener(PacketListener listener, PacketFilter filter){
-		if(mConnection!=null)
-			mConnection.addPacketSendingListener(listener, filter);
+		if(connection!=null)
+			connection.addPacketSendingListener(listener, filter);
 		
 	}
 	
 	public boolean isAuthenticated(){
-		return mConnection!=null && mConnection.isAuthenticated();
+		return connection!=null && connection.isAuthenticated();
 	}
 	
 	private static void fixConfig(AndroidConnectionConfiguration connectionConfiguration){
